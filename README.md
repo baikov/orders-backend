@@ -1,4 +1,4 @@
-# Django (DRF) template for REST API backend
+# Backend for Orders project
 
 [![Based on Cookiecutter Django](https://img.shields.io/badge/based%20on-Cookiecutter%20Django-ff69b4.svg?logo=cookiecutter)](https://github.com/cookiecutter/cookiecutter-django/)
 [![Black code style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/ambv/black)
@@ -6,23 +6,41 @@
 
 Other parts:
 
-1. [Traefik 2.10 as revers-proxy in Docker (SSL in dev and prod)](https://github.com/baikov/tpl-traefik)
-2. [Nuxt 3 production-ready template in Docker (SPA/SSR)](https://github.com/baikov/tpl-nuxt3)
-3. [Django/DRF backend in Docker (based on django-cookiecutter)](https://github.com/baikov/drf-tpl)
+1. [Revers-proxy](https://github.com/baikov/orders-traefik)
+2. [Front](https://github.com/baikov/orders-frontend)
+3. [Back](https://github.com/baikov/orders-backend)
 
-## Features
-- Custom User model
-- Djoser registration
-- Celery + Redis + Flower
-- Sentry in prod
-- Nginx for media in prod
-- Silk profiling in dev
-
-## Improvement plan
-
-- [ ] add logging
 
 ## Local development
+
+### Preparation
+
+1. Create virtual environment
+    ```shell
+    python -m venv venv
+    ```
+1. Activate virtual environment
+    ```shell
+    source venv/bin/activate
+    ```
+1. Install requirements
+    ```shell
+    pip install -r requirements/local.txt
+    ```
+1. Install and activate all recomended `VSCode` extensions
+1. Install `pre-commit`
+    ```shell
+    pre-commit install
+    ```
+1. Install `Docker Desktop`
+1. Make sure `ruff` and `mypy` are working
+    ```shell
+    ruff check backend/
+    ```
+    ```shell
+    mypy backend/
+    ```
+1. Copy `.env.example` and rename it to `.env`
 
 Choose one of `.env` presets.
 
@@ -31,10 +49,9 @@ Choose one of `.env` presets.
 ### Mode 0: As separate dev server on custom port
 
 1. No need for a Traefik container
-1. Rename `.env.example` to `.env`
 1. Set `uniqe` project name
     ```env
-    COMPOSE_PROJECT_NAME=uniqe_name
+    COMPOSE_PROJECT_NAME=orders
     ```
 1. Uncomment `Mode 0` block and set custom ports if needed:
     ```env
@@ -56,7 +73,7 @@ Choose one of `.env` presets.
 1. Rename `.env.example` to `.env`
 1. Set the project name same as `COMPOSE_PROJECT_NAME` in Traefik `.env`
     ```env
-    COMPOSE_PROJECT_NAME=example
+    COMPOSE_PROJECT_NAME=orders
     ```
 1. Uncomment `Mode 1` block:
     ```env
@@ -75,14 +92,14 @@ Choose one of `.env` presets.
 1. Rename `.env.example` to `.env`
 1. Set the project name same as `COMPOSE_PROJECT_NAME` in Traefik `.env`
     ```env
-    COMPOSE_PROJECT_NAME=example
+    COMPOSE_PROJECT_NAME=orders
     ```
 1. Uncomment `Mode 2` block:
     ```env
     # Mode 2: As dev server behind the Traefik + SSL and custom domain
     # For Windows users: use `;` (semicolon) as separator - local.yml;local.traefik.yml;local.traefik.ssl.yml
     COMPOSE_FILE=local.yml:local.traefik.yml:local.traefik.ssl.yml
-    DOMAIN=tpl.local  # same as DOMAIN in Traefik .env!
+    DOMAIN=orders.local  # same as DOMAIN in Traefik .env!
     ```
 1. Run Traefik container, then run Django stack with `docker compose build` and `docker compose up -d`
 
@@ -124,21 +141,19 @@ Choose one of `.env` presets.
 
 ## Deploy to production
 
-> Using this modes assumes that the `your-domain.com` is already bound to your server (`A` records are configured) and Traefik container raised in production mode
-
 ### Mode 3: when front in SSR mode
 
 1. The Traefik container must be running in `Mode 3` on prod server
-1. Rename `.env.production.example` to `.env`
+1. Copy `.env.production.example` and rename it to `.env`
 1. Set the project name same as `COMPOSE_PROJECT_NAME` in Traefik `.env`
     ```env
-    COMPOSE_PROJECT_NAME=example
+    COMPOSE_PROJECT_NAME=orders
     ```
 1. Uncomment `Mode 3` block:
     ```env
     # Mode 3: For production with SSR
     COMPOSE_FILE=production.yml
-    DOMAIN=your-domain.com
+    DOMAIN=orders.baikov.dev
     ```
 1. Change all secure variables
 1. Add Sentry DSN and Email settings (optional)
@@ -147,7 +162,3 @@ Choose one of `.env` presets.
 ### Mode 4: when front in SPA mode
 
 coming soon...
-
-## Contributing
-
-I made this template for myself, but it's awesom if it helps someone else. The settings are far from ideal, so fell free to make a pull request.
