@@ -75,6 +75,7 @@ THIRD_PARTY_APPS = [
     "rest_framework",
     "djoser",
     "django_filters",
+    "django_extensions",
     # "rest_framework.authtoken",
     "corsheaders",
     "drf_spectacular",
