@@ -6,6 +6,7 @@ from django.db.models import QuerySet
 from backend.orders.models import (
     Customer,
     CustomerOrder,
+    CustomerProduct,
     Order,
     Product,
     ProductInOrder,
@@ -40,19 +41,17 @@ class Parser:
 
 class StroiTorgovlyaParser(Parser):
     _PRODUCT_COLUMN_NAME = "Второе наименование товара"
+    _CODE_COLUMN_NAME = "Артикул"
     _SKIPROWS = 1
 
     def _read(self) -> pd.DataFrame:
-        # col_names = [self._PRODUCT_COLUMN_NAME] + list(
-        #     self.trade_points.values_list("name", flat=True)
-        # )
         try:
             df = pd.read_excel(
                 self.file,
                 skiprows=self._SKIPROWS,
-                engine="openpyxl",  # usecols=col_names
+                engine="openpyxl",
             )
-            df = df.drop(df.columns[0], axis=1)  # удаляем первую колонку с Артикулом
+            # df = df.drop(df.columns[0], axis=1)  # удаляем первую колонку с Артикулом
         except Exception as e:
             print("Не получилось обработать файл", e)
             raise
@@ -65,26 +64,11 @@ class StroiTorgovlyaParser(Parser):
 
         return df
 
-    def parse_products(self) -> QuerySet[Product]:
-        df = self._read()
-        print(df)
-        products_from_file = df[self._PRODUCT_COLUMN_NAME].tolist()
-
-        for product_name in products_from_file:
-            product, _ = Product.objects.get_or_create(name=product_name)
-
-            if _:
-                logger.debug(f"Создан товар: {product}")
-            else:
-                logger.debug(f"Найден товар: {product}")
-
-            self.customer_order.products.add(product)
-        return self.customer_order.products.all()
-
-    def parse_trade_points(self) -> QuerySet[TradePoint]:
-        df = self._read()
+    def _parse_trade_points(self, df: pd.DataFrame) -> list[TradePoint]:
+        tp_list = []
         tp_names = df.columns.tolist()
         tp_names.remove(self._PRODUCT_COLUMN_NAME)
+        tp_names.remove(self._CODE_COLUMN_NAME)
         for tp_name in tp_names:
             tp, _ = TradePoint.objects.get_or_create(
                 name=tp_name, customer=self.customer
@@ -93,41 +77,140 @@ class StroiTorgovlyaParser(Parser):
                 logger.debug(f"Создана точка: {tp}")
             else:
                 logger.debug(f"Найдена точка: {tp}")
-        return self.customer.trade_points.all()
+            if df[tp.name].tolist():
+                tp_list.append(tp)
+        return tp_list
 
-    def create_orders(self):
-        df = self._read()
-        # products_from_file = df[self._PRODUCT_COLUMN_NAME].tolist()
-        products = self.customer_order.products.all()
-        for point in self.customer.trade_points.all():
-            logger.debug(f"point: {point}")
+    def _parse_products(self, df: pd.DataFrame) -> None:
+        products_from_file = df[self._PRODUCT_COLUMN_NAME].tolist()
+        codes_from_file = df[self._CODE_COLUMN_NAME].tolist()
+
+        # Create products if not exist
+        for row_num in range(len(products_from_file)):
+            customer_product, _ = CustomerProduct.objects.get_or_create(
+                name=products_from_file[row_num],
+                vendor_code=codes_from_file[row_num],
+                customer=self.customer,
+            )
+            if _:
+                logger.debug(f"Создан товар: {customer_product}")
+            else:
+                logger.debug(f"Найден товар: {customer_product}")
+
+    def _create_orders(self, df: pd.DataFrame, tp_list: list[TradePoint]):
+        unique_customer_products = []
+        for tp in tp_list:
+            logger.debug(f"Создаем заказ на точку: {tp}")
             products_in_order = []
-            for product in products:
-                row = df[df[self._PRODUCT_COLUMN_NAME] == product.name].index[0]
-                logger.debug(f"row: {row}")
-                amount = df.loc[row, point.name]
-                logger.debug(f"amount: {amount}")
-                if amount > 0:
+
+            for _, row in df.iterrows():
+                if row[tp.name] > 0:
+                    customer_product = CustomerProduct.objects.get(
+                        name=row[self._PRODUCT_COLUMN_NAME],
+                    )
                     product_in_order = ProductInOrder(
-                        product=product,
-                        amount=amount,
+                        product=customer_product,
+                        amount=int(row[tp.name]),
                     )
                     products_in_order.append(product_in_order)
+
+                    if customer_product not in unique_customer_products:
+                        unique_customer_products.append(customer_product)
 
             if products_in_order:
                 order = Order(
                     customer_order=self.customer_order,
-                    trade_point=point,
+                    trade_point=tp,
                 )
                 order.save()
                 for product_in_order in products_in_order:
                     product_in_order.order = order
                     product_in_order.save()
+        self.customer_order.products.add(*unique_customer_products)
+
+    def parse(self):
+        df = self._read()
+
+        tp_list = self._parse_trade_points(df)
+        self._parse_products(df)
+        self._create_orders(df, tp_list)
+
+
+class OseniParser(Parser):
+    _PRODUCT_COLUMN_NAME = "Номенклатура"
+    _TP_COLUMN_NAME = "Код"
+    _VENDOR_CODE_COLUMN_NAME = "Артикул"
+    _QUANTITY_COLUMN_NAME = "Количество"
+    _SKIPROWS = 7
+    _INCLUDE_COLUMNS = [
+        _VENDOR_CODE_COLUMN_NAME,
+        _TP_COLUMN_NAME,
+        _PRODUCT_COLUMN_NAME,
+        _QUANTITY_COLUMN_NAME,
+    ]
+
+    def _read(self) -> pd.DataFrame:
+        try:
+            df = pd.read_excel(
+                self.file,
+                skiprows=self._SKIPROWS,
+                usecols=self._INCLUDE_COLUMNS,
+                engine="openpyxl",
+            )
+        except Exception as e:
+            print("Не получилось обработать файл", e)
+            raise
+
+        # Заполняем пустые ячейки нулями
+        df = df.fillna(0)
+
+        if df.empty:
+            print("Из файла не загрузилось ни одной строки!")
+
+        return df
+
+    def parse(self):
+        df = self._read()
+        order = None
+        unique_customer_products = []
+        for _, row in df.iterrows():
+            if "Магазин" in str(row[self._TP_COLUMN_NAME]):
+                tp, _ = TradePoint.objects.get_or_create(
+                    name=row[self._TP_COLUMN_NAME], customer=self.customer
+                )
+                if _:
+                    logger.debug(f"Создана точка: {tp}")
+                else:
+                    logger.debug(f"Найдена точка: {tp}")
+
+                logger.debug("Создаем заказ на точку: {tp}")
+                order = Order(customer_order=self.customer_order, trade_point=tp)
+                order.save()
+
+            elif row[self._TP_COLUMN_NAME] and order is not None:
+                customer_product, _ = CustomerProduct.objects.get_or_create(
+                    name=row[self._PRODUCT_COLUMN_NAME],
+                    vendor_code=row[self._VENDOR_CODE_COLUMN_NAME],
+                    customer=self.customer,
+                )
+                if customer_product not in unique_customer_products:
+                    unique_customer_products.append(customer_product)
+
+                if int(row[self._QUANTITY_COLUMN_NAME]) > 0:
+                    product_in_order = ProductInOrder(
+                        product=customer_product,
+                        amount=int(row[self._QUANTITY_COLUMN_NAME]),
+                        order=order,
+                    )
+                    product_in_order.save()
+        self.customer_order.products.add(*unique_customer_products)
 
 
 class ParserFactory:
     def create_parser(self, customer_order: CustomerOrder) -> Parser:
         if customer_order.customer.code == "stroytorgovlya":
             return StroiTorgovlyaParser(customer_order)
+        elif customer_order.customer.code == "oseni":
+            return OseniParser(customer_order)
         else:
             raise ValueError("Customer parser does not exist.")

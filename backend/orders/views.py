@@ -1,12 +1,21 @@
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
-from rest_framework import status, viewsets
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from backend.orders.models import Customer, CustomerOrder, Order, Product, TradePoint
+# from rest_framework.serializers import BaseSerializer
+from backend.orders.models import (
+    Customer,
+    CustomerOrder,
+    CustomerProduct,
+    Order,
+    Product,
+    TradePoint,
+)
 from backend.orders.serializers import (
     CustomerOrderSerializer,
+    CustomerProductSerializer,
     CustomerSerializer,
     OrderSerializer,
     ProductSerializer,
@@ -25,12 +34,26 @@ class CustomerViewSet(viewsets.ModelViewSet):
 class TradePointViewSet(viewsets.ModelViewSet):
     queryset = TradePoint.objects.all()
     serializer_class = TradePointSerializer
+    filterset_fields = ("customer",)
 
 
 @extend_schema(tags=["Products"])
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    filter_backends = [filters.SearchFilter]
+    search_fields = ["vendor_code"]
+
+
+@extend_schema(tags=["CustomerProducts"])
+class CustomerProductViewSet(viewsets.ModelViewSet):
+    queryset = CustomerProduct.objects.all()
+    serializer_class = CustomerProductSerializer
+
+    # def get_serializer_class(self) -> type[BaseSerializer]:
+    #     if self.action == "update":
+    #         return CustomerProductInputSerializer
+    #     return super().get_serializer_class()
 
 
 @extend_schema(tags=["CustomerOrders"])
@@ -46,11 +69,12 @@ class CustomerOrderViewSet(viewsets.ModelViewSet):
         factory = ParserFactory()
         parser = factory.create_parser(instance)
         # Добавить продукты в БД
-        parser.parse_products()
+        # parser.parse_products()
         # Добавить торговые точки в БД
-        parser.parse_trade_points()
+        # parser.parse_trade_points()
         # Создать заказы по точкам
         # parser.create_orders()
+        parser.parse()
 
     @action(methods=["GET"], detail=True, url_path="create-tp-orders")
     def create_tp_orders(self, request, pk):
