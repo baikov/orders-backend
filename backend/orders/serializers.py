@@ -3,6 +3,7 @@ from rest_framework import serializers
 from backend.orders.models import (
     Customer,
     CustomerOrder,
+    CustomerProduct,
     Order,
     Product,
     ProductInOrder,
@@ -29,6 +30,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "name",
             "tp_count",
             "last_order",
+            "order_in_packs",
         ]
 
 
@@ -39,27 +41,55 @@ class TradePointSerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    option = serializers.SerializerMethodField(read_only=True)
+
+    def get_option(self, obj):
+        return f"({obj.vendor_code}) {obj.name}"
+
     class Meta:
         model = Product
         fields = "__all__"
 
 
+class CustomerProductSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        source="product",
+        write_only=True,
+    )
+
+    class Meta:
+        model = CustomerProduct
+        fields = [
+            "id",
+            "name",
+            "vendor_code",
+            "product",
+            "product_id",
+        ]
+        extra_kwargs = {
+            "name": {"read_only": True},
+            "vendor_code": {"read_only": True},
+        }
+
+
 class ProductInOrderSerializer(serializers.ModelSerializer):
     vendor_code = serializers.ReadOnlyField(source="product.vendor_code")
+    base_vendor_code = serializers.ReadOnlyField(source="product.product.vendor_code")
     product_name = serializers.ReadOnlyField(source="product.name")
+    base_product_name = serializers.ReadOnlyField(source="product.product.name")
     amount = serializers.IntegerField()
-    amount_in_pack = serializers.ReadOnlyField(source="product.amount_in_pack")
-
-    # def get_amount(self, obj):
-    #     return int(obj.amount / obj.product.amount_in_pack)
-    #     # return obj.amount
+    amount_in_pack = serializers.ReadOnlyField(source="product.product.amount_in_pack")
 
     class Meta:
         model = ProductInOrder
         fields = [
             "id",
             "product_name",
+            "base_product_name",
             "vendor_code",
+            "base_vendor_code",
             "amount",
             "amount_in_pack",
         ]
@@ -88,7 +118,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class CustomerOrderSerializer(serializers.ModelSerializer):
     customer_name = serializers.ReadOnlyField(source="customer.name")
-    products = ProductSerializer(many=True, read_only=True)
+    products = CustomerProductSerializer(many=True, read_only=True)
     created = serializers.DateTimeField(format="%d.%m.%Y", read_only=True)
 
     class Meta:
