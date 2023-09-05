@@ -59,7 +59,7 @@ class TradePoint(models.Model):
 
 class Product(models.Model):
     name = models.CharField(max_length=255, verbose_name="Название товара")
-    vendor_code = models.CharField(max_length=255, blank=True, verbose_name="Артикул")
+    vendor_code = models.CharField(max_length=255, unique=True, verbose_name="Артикул")
     volume = models.PositiveIntegerField(
         verbose_name="Объем, мл. (Вес, гр.)", blank=True, null=True
     )
@@ -90,7 +90,7 @@ class CustomerProduct(models.Model):
     )
     product = models.ForeignKey(
         Product,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         verbose_name="Товар из внутренней матрицы",
         related_name="customer_products",
         blank=True,
