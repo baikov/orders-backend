@@ -37,7 +37,12 @@ class CustomerSerializer(serializers.ModelSerializer):
 class TradePointSerializer(serializers.ModelSerializer):
     class Meta:
         model = TradePoint
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "customer",
+            "sapcode",
+        ]
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -48,14 +53,21 @@ class ProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = "__all__"
+        fields = [
+            "id",
+            "name",
+            "vendor_code",
+            "volume",
+            "amount_in_pack",
+            "option",
+        ]
 
 
 class CustomerProductSerializer(serializers.ModelSerializer):
-    product = ProductSerializer(read_only=True)
-    product_id = serializers.PrimaryKeyRelatedField(
+    base_product = ProductSerializer(read_only=True)
+    base_product_id = serializers.PrimaryKeyRelatedField(
         queryset=Product.objects.all(),
-        source="product",
+        source="base_product",
         write_only=True,
     )
 
@@ -65,8 +77,8 @@ class CustomerProductSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "vendor_code",
-            "product",
-            "product_id",
+            "base_product",
+            "base_product_id",
         ]
         extra_kwargs = {
             "name": {"read_only": True},
@@ -76,11 +88,15 @@ class CustomerProductSerializer(serializers.ModelSerializer):
 
 class ProductInOrderSerializer(serializers.ModelSerializer):
     vendor_code = serializers.ReadOnlyField(source="product.vendor_code")
-    base_vendor_code = serializers.ReadOnlyField(source="product.product.vendor_code")
+    base_vendor_code = serializers.ReadOnlyField(
+        source="product.base_product.vendor_code"
+    )
     product_name = serializers.ReadOnlyField(source="product.name")
-    base_product_name = serializers.ReadOnlyField(source="product.product.name")
+    base_product_name = serializers.ReadOnlyField(source="product.base_product.name")
     amount = serializers.IntegerField()
-    amount_in_pack = serializers.ReadOnlyField(source="product.product.amount_in_pack")
+    amount_in_pack = serializers.ReadOnlyField(
+        source="product.base_product.amount_in_pack"
+    )
 
     class Meta:
         model = ProductInOrder
@@ -120,6 +136,10 @@ class CustomerOrderSerializer(serializers.ModelSerializer):
     customer_name = serializers.ReadOnlyField(source="customer.name")
     products = CustomerProductSerializer(many=True, read_only=True)
     created = serializers.DateTimeField(format="%d.%m.%Y", read_only=True)
+    is_ready = serializers.SerializerMethodField(read_only=True)
+
+    def get_is_ready(self, obj):
+        return all([product.base_product for product in obj.products.all()])
 
     class Meta:
         model = CustomerOrder
@@ -130,4 +150,5 @@ class CustomerOrderSerializer(serializers.ModelSerializer):
             "file",
             "products",
             "created",
+            "is_ready",
         ]
