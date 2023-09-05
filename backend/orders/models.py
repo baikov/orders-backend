@@ -88,7 +88,7 @@ class CustomerProduct(models.Model):
         verbose_name="Клиент",
         related_name="products",
     )
-    product = models.ForeignKey(
+    base_product = models.ForeignKey(
         Product,
         on_delete=models.SET_NULL,
         verbose_name="Товар из внутренней матрицы",
