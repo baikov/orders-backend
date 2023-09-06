@@ -89,13 +89,15 @@ class CustomerProductSerializer(serializers.ModelSerializer):
 class ProductInOrderSerializer(serializers.ModelSerializer):
     vendor_code = serializers.ReadOnlyField(source="product.vendor_code")
     base_vendor_code = serializers.ReadOnlyField(
-        source="product.base_product.vendor_code"
+        source="product.base_product.vendor_code", default=""
     )
     product_name = serializers.ReadOnlyField(source="product.name")
-    base_product_name = serializers.ReadOnlyField(source="product.base_product.name")
+    base_product_name = serializers.ReadOnlyField(
+        source="product.base_product.name", default=""
+    )
     amount = serializers.IntegerField()
     amount_in_pack = serializers.ReadOnlyField(
-        source="product.base_product.amount_in_pack"
+        source="product.base_product.amount_in_pack", default=0
     )
 
     class Meta:
@@ -136,10 +138,9 @@ class CustomerOrderSerializer(serializers.ModelSerializer):
     customer_name = serializers.ReadOnlyField(source="customer.name")
     products = CustomerProductSerializer(many=True, read_only=True)
     created = serializers.DateTimeField(format="%d.%m.%Y", read_only=True)
-    is_ready = serializers.SerializerMethodField(read_only=True)
-
-    def get_is_ready(self, obj):
-        return all([product.base_product for product in obj.products.all()])
+    order_in_packs = serializers.BooleanField(
+        read_only=True, source="customer.order_in_packs"
+    )
 
     class Meta:
         model = CustomerOrder
@@ -148,7 +149,7 @@ class CustomerOrderSerializer(serializers.ModelSerializer):
             "customer",
             "customer_name",
             "file",
+            "order_in_packs",
             "products",
             "created",
-            "is_ready",
         ]
