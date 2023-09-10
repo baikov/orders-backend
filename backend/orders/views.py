@@ -60,7 +60,7 @@ class CustomerProductViewSet(viewsets.ModelViewSet):
 class CustomerOrderViewSet(viewsets.ModelViewSet):
     queryset = CustomerOrder.objects.prefetch_related(
         "products", "products__base_product"
-    ).all()
+    ).order_by("-created")
     serializer_class = CustomerOrderSerializer
     filterset_fields = ("customer",)
 
@@ -71,16 +71,6 @@ class CustomerOrderViewSet(viewsets.ModelViewSet):
         factory = ParserFactory()
         parser = factory.create_parser(instance)
         parser.parse()
-
-    # @action(methods=["GET"], detail=True, url_path="create-tp-orders")
-    # def create_tp_orders(self, request, pk):
-    #     instance = self.get_object()
-    #     factory = ParserFactory()
-    #     parser = factory.create_parser(instance)
-    #     # Создать заказы по точкам
-    #     parser.create_orders()
-
-    #     return Response("OK", status=status.HTTP_200_OK)
 
 
 @extend_schema(tags=["Orders"])

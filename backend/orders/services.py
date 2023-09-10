@@ -187,10 +187,11 @@ class OseniParser(Parser):
                 order = Order(customer_order=self.customer_order, trade_point=tp)
                 order.save()
 
+            # TODO: get by unique vendor_code not by name
             elif row[self._TP_COLUMN_NAME] and order is not None:
                 customer_product, _ = CustomerProduct.objects.get_or_create(
-                    name=row[self._PRODUCT_COLUMN_NAME],
-                    vendor_code=row[self._VENDOR_CODE_COLUMN_NAME],
+                    name=row[self._PRODUCT_COLUMN_NAME].strip(),
+                    vendor_code=row[self._VENDOR_CODE_COLUMN_NAME].strip(),
                     customer=self.customer,
                 )
                 if customer_product not in unique_customer_products:
