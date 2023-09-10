@@ -1,5 +1,3 @@
-import logging
-
 import pandas as pd
 from django.db.models import QuerySet
 
@@ -12,8 +10,6 @@ from backend.orders.models import (
     ProductInOrder,
     TradePoint,
 )
-
-logger = logging.getLogger(__name__)
 
 
 class Parser:
@@ -73,10 +69,6 @@ class StroiTorgovlyaParser(Parser):
             tp, _ = TradePoint.objects.get_or_create(
                 name=tp_name, customer=self.customer
             )
-            if _:
-                logger.debug(f"Создана точка: {tp}")
-            else:
-                logger.debug(f"Найдена точка: {tp}")
             if df[tp.name].tolist():
                 tp_list.append(tp)
         return tp_list
@@ -92,15 +84,10 @@ class StroiTorgovlyaParser(Parser):
                 vendor_code=codes_from_file[row_num],
                 customer=self.customer,
             )
-            if _:
-                logger.debug(f"Создан товар: {customer_product}")
-            else:
-                logger.debug(f"Найден товар: {customer_product}")
 
     def _create_orders(self, df: pd.DataFrame, tp_list: list[TradePoint]):
         unique_customer_products = []
         for tp in tp_list:
-            logger.debug(f"Создаем заказ на точку: {tp}")
             products_in_order = []
 
             for _, row in df.iterrows():
@@ -174,16 +161,14 @@ class OseniParser(Parser):
         order = None
         unique_customer_products = []
         for _, row in df.iterrows():
-            if "Магазин" in str(row[self._TP_COLUMN_NAME]):
+            if row[self._VENDOR_CODE_COLUMN_NAME] == "Итого":
+                break
+            if str(row[self._VENDOR_CODE_COLUMN_NAME]) != str(
+                row[self._TP_COLUMN_NAME]
+            ):
                 tp, _ = TradePoint.objects.get_or_create(
                     name=row[self._TP_COLUMN_NAME], customer=self.customer
                 )
-                if _:
-                    logger.debug(f"Создана точка: {tp}")
-                else:
-                    logger.debug(f"Найдена точка: {tp}")
-
-                logger.debug("Создаем заказ на точку: {tp}")
                 order = Order(customer_order=self.customer_order, trade_point=tp)
                 order.save()
 
