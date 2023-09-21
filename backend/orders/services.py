@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pandas as pd
 from django.db.models import QuerySet
 
@@ -192,11 +194,115 @@ class OseniParser(Parser):
         self.customer_order.products.add(*unique_customer_products)
 
 
+class KruasanParser(Parser):
+    _PRODUCT_COLUMN_NAME = "Напитки"
+    _SKIPROWS = 0
+
+    def _read(self) -> pd.DataFrame:
+        try:
+            df = pd.read_excel(
+                self.file,
+                header=None,
+                skiprows=self._SKIPROWS,
+                engine="openpyxl",
+            )
+        except Exception as e:
+            print("Не получилось обработать файл", e)
+            raise
+
+        # Заполняем пустые ячейки нулями
+        df = df.fillna(0)
+
+        if df.empty:
+            print("Из файла не загрузилось ни одной строки!")
+
+        return df
+
+    def _parse_trade_points(self, df: pd.DataFrame) -> list[TradePoint]:
+        # Удаляем первый столбец (столбец 'A')
+        tp_df = df.iloc[:, 1:]
+        # Оставляем только первые три строки
+        tp_df = tp_df.head(3)
+        tp_list = []
+        for column_name in tp_df.columns:
+            column_data = tp_df[column_name].tolist()
+            tp_name = f"{column_data[1]} ({column_data[0]})"
+            tp, _ = TradePoint.objects.get_or_create(
+                sapcode=column_data[2],
+                customer=self.customer,
+                defaults={"name": tp_name},
+            )
+
+            tp_list.append(tp)
+
+        return tp_list
+
+    def _parse_products(self, df: pd.DataFrame) -> None:
+        # Удаляем вторую и третью строки (индексы 1 и 2)
+        prod_df = df.drop([0, 1, 2])
+        products_from_file = prod_df[0].tolist()
+        # Create products if not exist
+        for row_num in range(len(products_from_file)):
+            CustomerProduct.objects.get_or_create(
+                name=products_from_file[row_num].strip(),
+                customer=self.customer,
+                defaults={"vendor_code": uuid4().hex},
+            )
+
+    def _create_orders(self, df: pd.DataFrame, tp_list: list[TradePoint]):
+        rename = {}
+        for column_name in df.columns:
+            values = df[column_name].tolist()
+            if column_name == 0:
+                rename[column_name] = values[0]
+                self._PRODUCT_COLUMN_NAME = values[0]
+            else:
+                rename[column_name] = values[2]
+        df = df.rename(columns=rename)
+        df = df.drop([0, 1, 2])
+        unique_customer_products = []
+        for tp in tp_list:
+            products_in_order = []
+
+            for _, row in df.iterrows():
+                if row[tp.sapcode] > 0:
+                    customer_product = CustomerProduct.objects.get(
+                        name=row[self._PRODUCT_COLUMN_NAME],
+                    )
+                    product_in_order = ProductInOrder(
+                        product=customer_product,
+                        amount=int(row[tp.sapcode]),
+                    )
+                    products_in_order.append(product_in_order)
+
+                    if customer_product not in unique_customer_products:
+                        unique_customer_products.append(customer_product)
+
+            if products_in_order:
+                order = Order(
+                    customer_order=self.customer_order,
+                    trade_point=tp,
+                )
+                order.save()
+                for product_in_order in products_in_order:
+                    product_in_order.order = order
+                    product_in_order.save()
+        self.customer_order.products.add(*unique_customer_products)
+
+    def parse(self):
+        df = self._read()
+        tp_list = self._parse_trade_points(df)
+        self._parse_products(df)
+        self._create_orders(df, tp_list)
+
+
 class ParserFactory:
     def create_parser(self, customer_order: CustomerOrder) -> Parser:
         if customer_order.customer.code == "stroytorgovlya":
             return StroiTorgovlyaParser(customer_order)
         elif customer_order.customer.code == "oseni":
             return OseniParser(customer_order)
+        elif customer_order.customer.code == "kruasan":
+            return KruasanParser(customer_order)
         else:
             raise ValueError("Customer parser does not exist.")
