@@ -194,6 +194,74 @@ class OseniParser(Parser):
         self.customer_order.products.add(*unique_customer_products)
 
 
+class OseniParserV2(Parser):
+    _PRODUCT_COLUMN_NAME = "Номенклатура"
+    _TP_COLUMN_NAME = "Магазин"
+    _VENDOR_CODE_COLUMN_NAME = "Артикул"
+    _QUANTITY_COLUMN_NAME = "Количество"
+    _SKIPROWS = 0
+    _INCLUDE_COLUMNS = [
+        _VENDOR_CODE_COLUMN_NAME,
+        _TP_COLUMN_NAME,
+        _PRODUCT_COLUMN_NAME,
+        _QUANTITY_COLUMN_NAME,
+    ]
+
+    def _read(self) -> pd.DataFrame:
+        try:
+            df = pd.read_excel(
+                self.file,
+                skiprows=self._SKIPROWS,
+                usecols=self._INCLUDE_COLUMNS,
+                engine="openpyxl",
+            )
+        except Exception as e:
+            print("Не получилось обработать файл", e)
+            raise
+
+        # Заполняем пустые ячейки нулями
+        df = df.fillna(0)
+
+        if df.empty:
+            print("Из файла не загрузилось ни одной строки!")
+
+        return df
+
+    def parse(self):
+        df = self._read()
+        order = None
+        unique_customer_products = []
+        tp_name = None
+        for _, row in df.iterrows():
+            if row[self._PRODUCT_COLUMN_NAME] == "Итого:":
+                break
+
+            if tp_name != row[self._TP_COLUMN_NAME]:
+                tp_name = row[self._TP_COLUMN_NAME]
+                tp, _ = TradePoint.objects.get_or_create(
+                    name=row[self._TP_COLUMN_NAME], customer=self.customer
+                )
+                order = Order(customer_order=self.customer_order, trade_point=tp)
+                order.save()
+
+            customer_product, _ = CustomerProduct.objects.get_or_create(
+                name=row[self._PRODUCT_COLUMN_NAME].strip(),
+                vendor_code=str(row[self._VENDOR_CODE_COLUMN_NAME]).strip(),
+                customer=self.customer,
+            )
+            if customer_product not in unique_customer_products:
+                unique_customer_products.append(customer_product)
+
+            if int(row[self._QUANTITY_COLUMN_NAME]) > 0:
+                product_in_order = ProductInOrder(
+                    product=customer_product,
+                    amount=int(row[self._QUANTITY_COLUMN_NAME]),
+                    order=order,
+                )
+                product_in_order.save()
+        self.customer_order.products.add(*unique_customer_products)
+
+
 class KruasanParser(Parser):
     _PRODUCT_COLUMN_NAME = "Напитки"
     _SKIPROWS = 0
@@ -301,7 +369,7 @@ class ParserFactory:
         if customer_order.customer.code == "stroytorgovlya":
             return StroiTorgovlyaParser(customer_order)
         elif customer_order.customer.code == "oseni":
-            return OseniParser(customer_order)
+            return OseniParserV2(customer_order)
         elif customer_order.customer.code == "kruasan":
             return KruasanParser(customer_order)
         else:
