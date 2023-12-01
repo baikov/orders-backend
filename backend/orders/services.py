@@ -246,7 +246,7 @@ class OseniParserV2(Parser):
 
             customer_product, _ = CustomerProduct.objects.get_or_create(
                 name=row[self._PRODUCT_COLUMN_NAME].strip(),
-                vendor_code=str(row[self._VENDOR_CODE_COLUMN_NAME]).strip(),
+                vendor_code=str(int(row[self._VENDOR_CODE_COLUMN_NAME])).strip(),
                 customer=self.customer,
             )
             if customer_product not in unique_customer_products:
