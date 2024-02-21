@@ -89,9 +89,7 @@ CORS_ALLOWED_ORIGINS = (
         "http://localhost:3019",
     ]
 )
-CSRF_TRUSTED_ORIGINS = ["https://" + host for host in ALLOWED_HOSTS] + [
-    "http://" + host for host in ALLOWED_HOSTS
-]
+CSRF_TRUSTED_ORIGINS = ["https://" + host for host in ALLOWED_HOSTS] + ["http://" + host for host in ALLOWED_HOSTS]
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None  # type: ignore
 CSRF_COOKIE_DOMAIN = env.str("DOMAIN", default="localhost")
 # CORS_ALLOW_ALL_ORIGINS = True

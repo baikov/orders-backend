@@ -1,4 +1,6 @@
 [tool.ruff]
+target-version = "py311"
+line-length = 120
 unfixable = ["F401", "F841"]
 exclude = [
     ".tox",
@@ -9,7 +11,13 @@ exclude = [
     "node_modules",
     "venv",
     ".venv",
+    "env",
+    ".env",
 ]
+
+# [tool.ruff.format]
+# quote-style = "double"
+# docstring-code-format = true
 
 [tool.ruff.isort]
 known-first-party = ["backend", "config"]
@@ -29,7 +37,7 @@ plugins = ["django_coverage_plugin"]
 
 # ==== black ====
 [tool.black]
-# line-length = 88
+line-length = 120
 target-version = ['py311']
 
 # ==== mypy ====
@@ -40,7 +48,7 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_unused_configs = true
-exclude = ['venv/',]
+exclude = ['venv/', 'env/']
 plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
 
 [[tool.mypy.overrides]]
@@ -54,11 +62,23 @@ django_settings_module = "config.settings.test"
 
 # ==== PyLint ====
 [tool.pylint.MASTER]
+disable = [
+    'fixme',
+    'missing-class-docstring',
+    'missing-function-docstring',
+    'missing-module-docstring',
+    'no-else-return',
+    'too-few-public-methods',
+    'too-many-ancestors',
+    'abstract-method',
+    #'broad-exception-raised',
+    'import-outside-toplevel',
+]
 load-plugins = ["pylint_django", "pylint_celery"]
 django-settings-module = "config.settings.local"
 
 [tool.pylint.FORMAT]
-max-line-length = 88
+max-line-length = 120
 
 [tool.pylint."MESSAGES CONTROL"]
 disable = ["missing-docstring", "invalid-name"]
