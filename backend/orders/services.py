@@ -7,8 +7,8 @@ from uuid import uuid4
 import pandas as pd
 from django.conf import settings
 from django.db.models import QuerySet
-from loguru import logger
 
+# from loguru import logger
 from backend.orders.models import (
     Customer,
     CustomerOrder,
@@ -400,14 +400,15 @@ class BahusParser(Parser):
         except zipfile.BadZipFile:
             print("Файл повреждён или не является правильным ZIP-архивом.")
         for df in dataframes:
-            logger.debug("Заказчик: {}", df.iat[3, 3])
+            continue
+            # logger.debug("Заказчик: {}", df.iat[3, 3])
         # logger.debug("Адрес: {}", dataframes[0].iat[4, 3])
 
         return dataframes
 
     def _parse_trade_points(self, dfs: list[pd.DataFrame]) -> list[TradePoint]:
         unique_customer_products = []
-        logger.debug("DFS: {}", dfs)
+        # logger.debug("DFS: {}", dfs)
         for df in dfs:
             df = df.fillna(0)
             match = re.search(r"\".*\"", df.iat[3, 3])
@@ -415,8 +416,8 @@ class BahusParser(Parser):
                 tp_name = match.group(0)[1:-1]
             else:
                 tp_name = df.iat[3, 3]
-            logger.info("Заказчик: {}", tp_name)
-            logger.info("Адрес: {}", df.iat[4, 3])
+            # logger.info("Заказчик: {}", tp_name)
+            # logger.info("Адрес: {}", df.iat[4, 3])
 
             # Create TP
             tp, _ = TradePoint.objects.get_or_create(name=tp_name, customer=self.customer)
@@ -430,10 +431,10 @@ class BahusParser(Parser):
             df.drop(df.index[0], inplace=True)
 
             df = df.loc[:, self._INCLUDE_COLUMNS]
-            logger.debug(df)
+            # logger.debug(df)
 
             for _, row in df.iterrows():
-                logger.debug(f"Artice: {row[self._VENDOR_CODE_COLUMN_NAME]}")
+                # logger.debug(f"Artice: {row[self._VENDOR_CODE_COLUMN_NAME]}")
                 if not row[self._VENDOR_CODE_COLUMN_NAME]:
                     break
                 customer_product, _ = CustomerProduct.objects.get_or_create(
@@ -490,7 +491,7 @@ class ProdstarrParser(Parser):
         # Заполняем пустые ячейки нулями
         df = df.fillna(0)
 
-        logger.debug("df: {}", df)
+        # logger.debug("df: {}", df)
 
         if df.empty:
             print("Из файла не загрузилось ни одной строки!")
@@ -510,7 +511,7 @@ class ProdstarrParser(Parser):
 
     def _parse_products(self, df: pd.DataFrame) -> None:
         products_from_file = df[self._PRODUCT_COLUMN_NAME].tolist()
-        logger.debug("products_from_file: {}", products_from_file)
+        # logger.debug("products_from_file: {}", products_from_file)
 
         # Create products if not exist
         for row_num in range(len(products_from_file)):
@@ -525,7 +526,7 @@ class ProdstarrParser(Parser):
             products_in_order: list[ProductInOrder] = []
 
             for _, row in df.iterrows():
-                logger.debug("row: {}", row[tp.name])
+                # logger.debug("row: {}", row[tp.name])
                 if row[tp.name] > 0:
                     customer_product = CustomerProduct.objects.get(
                         name=row[self._PRODUCT_COLUMN_NAME],
