@@ -503,6 +503,7 @@ class ProdstarrParser(Parser):
         tp_names = df.columns.tolist()
 
         tp_names.remove(self._PRODUCT_COLUMN_NAME)
+        tp_names = [tp_name for tp_name in tp_names if "Unnamed" not in tp_name]
         for tp_name in tp_names:
             tp, _ = TradePoint.objects.get_or_create(name=tp_name, customer=self.customer)
             if any([qty for qty in df[tp_name].tolist()]):
